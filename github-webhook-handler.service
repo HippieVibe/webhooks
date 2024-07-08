@@ -1,17 +1,21 @@
 [Unit]
 Description=Run GitHub webhook handler
+Requires=github-webhook-handler.socket
 After=network.target nftables.service
 
 [Service]
 Type=simple
-DynamicUser=yes
+KillMode=mixed
+TimeoutStopSec=5
+User=www-data
 Group=www-data
 Restart=always
 Environment="GITHUB_WEBHOOK_SECRET=FIX_ME"
 Environment="GITHUB_ACCESS_TOKEN=FIX_ME"
 Environment="WEBHOOK_ENDPOINT=/webhook"
 Environment="HTML_FOLDER_ROOT=/var/www/html"
-ExecStart=/usr/bin/gunicorn --bind unix:/tmp/gunicorn.sock handle_github_webhook:app
+ExecStart=/usr/bin/gunicorn --chdir /opt/webhooks --bind unix:/run/github-webhooks.sock handle_github_webhook:app
+ExecReload=/bin/kill -s HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=github webhooks socket
+
+[Socket]
+ListenStream=/run/github-webhooks.sock
+# Our service won't need permissions for the socket, since it
+# inherits the file descriptor by socket activation
+# only the nginx daemon will need access to the socket
+SocketUser=www-data
+SocketMode=600
+
+[Install]
+WantedBy=sockets.target
