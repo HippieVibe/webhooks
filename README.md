@@ -1,9 +1,9 @@
 # Webhooks
 
-Install the gunicorn WSGI:
+Install the gunicorn WSGI and Flask:
 
 ```
-sudo apt install gunicorn
+sudo apt install gunicorn python3-flask
 ```
 
 Create an NGINX endpoint for this webhook:
@@ -20,7 +20,7 @@ location /webhook {
 
     # Send the HTTP request to gunicorn through its UNIX socket.
     # fail_timeout=0 means we always retry an upstream even if it failed
-    server unix:/tmp/gunicorn.sock fail_timeout=0;
+    proxy_pass http://unix:/tmp/gunicorn.sock;
 }
 ```
 

@@ -1,16 +1,24 @@
 import hashlib
 import hmac
 import os
+import shutil
+import zipfile
+from tempfile import TemporaryDirectory
 
+import requests
 from flask import Flask, abort, request
 from flask.typing import ResponseReturnValue
 
 app = Flask(__name__)
 
+HTTP_TIMEOUT = 30
+HTML_FOLDER_ROOT = os.environ["HTML_FOLDER_ROOT"]
+WEBHOOK_ENDPOINT = os.environ["WEBHOOK_ENDPOINT"]
 GITHUB_WEBHOOK_SECRET = os.environ["GITHUB_WEBHOOK_SECRET"]
+GITHUB_ACCESS_TOKEN = os.environ["GITHUB_ACCESS_TOKEN"]
 
 
-@app.route("/webhook", methods=["POST"])
+@app.route(WEBHOOK_ENDPOINT, methods=["POST"])
 def github_webhook() -> ResponseReturnValue:
     # Extract signature header
     signature = request.headers.get("X-Hub-Signature-256")
@@ -31,7 +39,41 @@ def github_webhook() -> ResponseReturnValue:
     # The signature was fine, let's parse the data
     request_data = request.get_json()
 
-    print(request_data)
+    if request_data["action"] != "completed":
+        abort(200, "Not interested in this event")
+
+    workflow = request_data["workflow_run"]
+
+    if workflow["conclusion"] != "success":
+        abort(200, "Only interested in successful workflows")
+
+    branch = workflow["head_branch"]
+    artifacts_url = workflow["artifacts_url"]
+    target_path = f"{HTML_FOLDER_ROOT}/{branch}"
+    resp = requests.get(artifacts_url, timeout=HTTP_TIMEOUT)
+    for artifact in resp.json()["artifacts"]:
+        if artifact["name"] == "generated_html":
+            with TemporaryDirectory() as tmp_dir:
+                generated_html_zip_path = f"{tmp_dir}/generated_html.zip"
+
+                with requests.get(
+                    artifact["archive_download_url"],
+                    headers={"Authorization": f"Bearer {GITHUB_ACCESS_TOKEN}"},
+                    timeout=HTTP_TIMEOUT,
+                    stream=True,
+                ) as zip_stream:
+                    zip_stream.raise_for_status()
+
+                    with open(generated_html_zip_path, "wb") as zip_file:
+                        for chunk in zip_stream.iter_content(chunk_size=8192):
+                            zip_file.write(chunk)
+
+                    with zipfile.ZipFile(generated_html_zip_path, "r") as zip_ref:
+                        if os.path.isdir(target_path):
+                            shutil.rmtree(target_path)
+                        zip_ref.extractall(target_path)
+
+            break
 
     return "done"
 

@@ -1,0 +1,17 @@
+[Unit]
+Description=Run GitHub webhook handler
+After=network.target nftables.service
+
+[Service]
+Type=simple
+DynamicUser=yes
+Group=www-data
+Restart=always
+Environment="GITHUB_WEBHOOK_SECRET=FIX_ME"
+Environment="GITHUB_ACCESS_TOKEN=FIX_ME"
+Environment="WEBHOOK_ENDPOINT=/webhook"
+Environment="HTML_FOLDER_ROOT=/var/www/html"
+ExecStart=/usr/bin/gunicorn --bind unix:/tmp/gunicorn.sock handle_github_webhook:app
+
+[Install]
+WantedBy=multi-user.target
